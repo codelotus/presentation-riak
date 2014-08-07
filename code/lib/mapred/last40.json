@@ -1,0 +1,23 @@
+{
+    "inputs":{
+        "bucket": "stock_activities",
+        "key_filters": [["and",
+            [["tokenize", "-", 1], ["eq", "SBUX"]],
+            [["tokenize", "-", 2], ["string_to_int"], ["between", 20140501, 20140519]]
+        ]]
+    },
+    "query": [
+        {
+            "map": {
+                "language": "javascript",
+                "source": "function(obj) { var data = JSON.parse(obj.values[0].data); return [[parseInt(data.date), data.close]]; }"
+            }
+        },
+        {
+            "reduce": {
+                "language":"javascript",
+                "source":"function(objects){ var sum = 0; objects.forEach(function(obj){ sum = sum + obj[1]}); return [sum / objects.length];}"
+            }
+        }
+    ]
+}

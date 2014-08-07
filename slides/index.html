@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="en">
+
+	<head>
+		<meta charset="utf-8">
+
+		<title>DenverJS - Riak</title>
+
+		<meta name="apple-mobile-web-app-capable" content="yes" />
+		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+		<link rel="stylesheet" href="css/reveal.min.css">
+		<link rel="stylesheet" href="css/theme/default.css" id="theme">
+
+		<!-- For syntax highlighting -->
+		<link rel="stylesheet" href="lib/css/zenburn.css">
+
+		<!-- If the query includes 'print-pdf', include the PDF print sheet -->
+		<script>
+			if( window.location.search.match( /print-pdf/gi ) ) {
+				var link = document.createElement( 'link' );
+				link.rel = 'stylesheet';
+				link.type = 'text/css';
+				link.href = 'css/print/pdf.css';
+				document.getElementsByTagName( 'head' )[0].appendChild( link );
+			}
+		</script>
+
+		<!--[if lt IE 9]>
+		<script src="lib/js/html5shiv.js"></script>
+		<![endif]-->
+	</head>
+
+	<body>
+
+		<div class="reveal">
+
+			<!-- Any section element inside of this container is displayed as a slide -->
+			<div class="slides">
+				<section>
+					<h1>Hacking With Riak</h1>
+					<h3>DenverJS</h3>
+				</section>
+
+				<section>
+					<h2>Marketing...</h2>
+					<p>
+                        Riak is an open source distributed database architected for:
+                        <ul>
+                            <li>Availability</li>
+                            <li>Fault-Tolerance</li>
+                            <li>Operational Simplicity</li>
+                            <li>Scalability</li>
+                        </ul>
+					</p>
+					<aside class="notes">
+					</aside>
+				</section>
+
+                <section>
+                    <h2>What is it?</h2>
+                    <ul>
+                        <li>NoSql key-value store</li>
+                        <li>Written in Erlang</li>
+                        <li>Implements ideas from Amazon's <a href="http://www.allthingsdistributed.com/files/amazon-dynamo-sosp2007.pdf">Dynamo</a></li>
+                    </ul>
+                </section>
+
+                <section>
+                    <img src="img/riak-data-distribution.png" style="background-color: #FFFFFF;" />
+					<aside class="notes">
+                        <ul>
+                            <li>4 nodes</li>
+                            <li>Replicated 3 times</li>
+                        </ul>
+					</aside>
+                </section>
+
+                <section>
+                    <h2>Getting Data In</h2>
+                </section>
+
+                <section>
+                    <h2>Verify Host is up</h2>
+                    <p>
+                        $ curl -v http://192.168.33.10:10018/ping<br/>
+                        HTTP/1.1 200 OK <br/>
+                        OK%
+                    </p>
+                </section>
+
+                <section>
+                    <p>
+                        <h3>PUT Data In</h3>
+                        <p>
+                            $ curl -v -X PUT http://192.168.33.10:10018/buckets/foo/keys/bar -d "Hello World"<br/>
+                            HTTP/1.1 204 No Content <br/>
+                        </p>
+                    </p>
+                    <p>
+                        <h3>GET Data Out</h3>
+                        <p>
+                            $ curl http://192.168.33.10:10018/buckets/foo/keys/bar<br/>
+                            HTTP/1.1 200 OK<br/>
+                            Hello World%<br/>
+                        </p>
+                    </p>
+                </section>
+
+                <section>
+                    <h3>Get All Buckets</h3>
+                    <p>
+                        $ curl -v http://192.168.33.10:10018/buckets\?buckets\=true<br/>
+                        HTTP/1.1 200 OK<br/>
+                        {"buckets":["foo"]}%  
+                    </p>
+                </section>
+
+                <section>
+                    <h3>Get All Keys In A Bucket</h3>
+                    <p>
+                        curl -v http://192.168.33.10:10018/buckets/foo/keys\?keys\=true<br/>
+                        HTTP/1.1 200 OK<br/>
+                        {"keys":["bar"]}%
+                    </p>
+                </section>
+
+                <section>
+                    <h3>And there is more</h3>
+                    <ul>
+                        <li>Links / Link Walking</li>
+                        <li>Metadata</li>
+                        <li>Mime Types</li>
+                    </ul>
+                    <aside class="notes">
+                        <ul>
+                            <li>Links: metadata to associate one key to another (one way)</li>
+                            <li>Metadata: Arbitrary data stored with the value</li>
+                            <li>Mime Types: image/png, application/json, etc</li>
+                        </ul>
+                    </aside>
+                </section>
+
+                <section>
+                    <p>But you don't want to write this...</p>
+                    <p>
+                        curl -X PUT http://localhost:8091/buckets/photos/keys/userid.jpg \<br/>
+                        -H "Content-Type: image/jpeg" \<br/>
+                        -H "Link: &lt;/buckets/users/keys/userid&gt;; riaktag=\"profile_photo\"" \<br/>
+                        --data-binary @user_profile_image.jpg
+                    </p>
+                </section>
+
+                <section>
+                    <h3>Let's talk about</h3>
+                    <img src="img/riakjs-logo.png" />
+                </section>
+
+                <section>
+                    <h3>Obtain a Connection</h3>
+                    <p>
+                        var db = require('riak-js').getClient({host: "riak.myhost", port: "8098"});
+                    </p>
+                </section>
+
+                <section>
+                    <h3>Put Something In</h3>
+                    <p>
+					<pre><code data-trim style="font-size: 20px; margin-top: 20px;">
+// db.save('bucket', 'key', 'value', metadata_object);
+
+db.save('stock_symbols', 'SBUX', {'company': 'starbucks'},
+  { links:
+    [{ bucket: 'exchanges', key: 'nasdaq', tag: 'traded_on' },
+     { bucket: 'etfs', key: 'XLY', tag: 'etf_containing' }]
+  });
+                    </code></pre>
+                    </p>
+                    <p style="font-size: 18px; margin-top: 20px;">
+                        http://www.etfchannel.com/finder/?a=etfsholding&amp;symbol=SBUX
+                    </p>
+                </section>
+
+                <section>
+                    <h3>Get Something Out</h3>
+                    <p>
+					<pre><code data-trim style="font-size: 20px; margin-top: 20px;">
+db.get('stock_symbols', 'SBUX', function(err, data, meta) {
+  if (err) throw err;
+  console.log(data);
+  console.log(meta.links);
+});
+                    </code></pre>
+                    </p>
+                </section>
+
+                <section>
+                    <h3>Destroy Something</h3>
+                    <p>
+					<pre><code data-trim style="font-size: 20px; margin-top: 20px;">
+                  db.remove('stock_symbols', 'MSFT');
+                    </code></pre>
+                    </p>
+                </section>
+
+                <section>
+                    <h2>Data Modeling</h2>
+                    <p>
+                        How does one design for a key value store?
+                    </p>
+                </section>
+
+                <section>
+                    <h2>Tools</h2>
+                    <p>
+                        <img src="img/keys-1.jpg"/>
+                    </p>
+                </section>
+
+
+
+                <section>
+                    <p>
+                        Embrace MANY writes
+                    </p>
+                </section>
+
+                <section>
+                    <h3>Same Data, Many Buckets</h3>
+                    <p>
+                        <img src="img/people_buckets.png">
+                    </p>
+                </section>
+
+                <section>
+                    <h3>Creative Keys</h3>
+                    <p>
+                        <h3>SBUX:20140505</h3>
+                        <h3>MSFT:20140505</h3>
+                        <h3>FB:20140505</h3>
+                    </p>
+                </section>
+
+                <section>
+                    <h2>Back to Riak.js</h2>
+                </section>
+
+                <section>
+                    <h2>Streaming Keys</h2>
+                    <p>
+					    <pre><code data-trim style="font-size: 20px; margin-top: 20px;">
+db.keys('stock_symbols', { keys: 'stream' })
+    .on('keys', function(key){
+        console.log("Key: " + data)
+    })
+    .on('end', function(){
+        console.log("Done..");
+    })
+    .start()
+                        </code></pre>
+                    </p>
+                    <p>
+                        Much better than:  /buckets/stock_symbols/keys?keys=true
+                    </p>
+                </section>
+
+
+                <section>
+                    <h2>Count Your Keys</h2>
+                    <p>
+					    <pre><code data-trim style="font-size: 20px; margin-top: 20px;">
+db.count('stock_symbols', function(err, data){ console.log(data) });
+                        </code></pre>
+                    </p>
+                </section>
+
+
+                <section>
+                    <h2>Link Walking</h2>
+					    <pre><code data-trim style="font-size: 20px; margin-top: 20px;">
+// Given:
+db.save('exchanges', 'nasdaq', { 'location': 'nyc'});
+db.save('stock_symbols', 'SBUX', {'company': 'starbucks'},
+  { links: [{ bucket: 'exchanges', key: 'nasdaq', tag: 'traded_on' }] });
+
+db.walk('stock_symbols', 'SBUX', [{bucket: 'exchanges', tag: "_"}], function(err, data){console.log(JSON.stringify(data));})
+                        </code></pre>
+                </section>
+
+
+                <section>
+                    <h2>Map / Reduce</h2>
+                </section>
+
+		</div>
+
+		<script src="lib/js/head.min.js"></script>
+		<script src="js/reveal.min.js"></script>
+
+		<script>
+
+			// Full list of configuration options available here:
+			// https://github.com/hakimel/reveal.js#configuration
+			Reveal.initialize({
+				controls: true,
+				progress: true,
+				history: true,
+				center: true,
+
+				theme: Reveal.getQueryHash().theme, // available themes are in /css/theme
+				transition: Reveal.getQueryHash().transition || 'none', // default/cube/page/concave/zoom/linear/fade/none
+
+				// Parallax scrolling
+				// parallaxBackgroundImage: 'https://s3.amazonaws.com/hakim-static/reveal-js/reveal-parallax-1.jpg',
+				// parallaxBackgroundSize: '2100px 900px',
+
+				// Optional libraries used to extend on reveal.js
+				dependencies: [
+					{ src: 'lib/js/classList.js', condition: function() { return !document.body.classList; } },
+					{ src: 'plugin/markdown/marked.js', condition: function() { return !!document.querySelector( '[data-markdown]' ); } },
+					{ src: 'plugin/markdown/markdown.js', condition: function() { return !!document.querySelector( '[data-markdown]' ); } },
+					{ src: 'plugin/highlight/highlight.js', async: true, callback: function() { hljs.initHighlightingOnLoad(); } },
+					{ src: 'plugin/zoom-js/zoom.js', async: true, condition: function() { return !!document.body.classList; } },
+					{ src: 'plugin/notes/notes.js', async: true, condition: function() { return !!document.body.classList; } }
+				]
+			});
+
+		</script>
+
+	</body>
+</html>
